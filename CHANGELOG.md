@@ -1,5 +1,102 @@
 ## Updates
 
+### 17-Sep-2024
+
+- The sokol_app.h Linux backend now has clipboard support. Many thanks to
+  @Dvad for the initial PR with most of the work and @qwx9 for the addtional
+  updates. See PR https://github.com/floooh/sokol/pull/1108 for details (this
+  isn't quite what ended up in sokol_app.h either, because I did a couple of code
+  cleanup changes during the merge).
+
+### 10-Sep-2024
+
+- Update sokol_imgui.h for Dear ImGui and cimgui version 1.91.1. This
+  breaks compatibility with older ImGui versions.
+  Fixes issue https://github.com/floooh/sokol/issues/1105.
+
+### 02-Sep-2024
+
+- Minor breaking change in sokol_gfx.h: The enum item `SG_FILTER_NONE` has been
+  removed. Until around Oct-2023 this was required to be used as mip-filter
+  on textures without mipmaps because of an unnecessary restriction in the
+  GL backend (see https://github.com/floooh/sokol/issues/929 for details).
+  The concept of a 'none' mipmap filter never mapped to some 3D backends
+  (specifically D3D11 and WebGPU).
+  If you are currently creating samplers with `.mipmap_filter = SG_FILTER_NONE`
+  you can simply remove that line. The new default value is `SG_FILTER_NEAREST`.
+  To restrict mipmap sampling access to a specific mipmap (or mipmap range),
+  use the `.min_lod` and `.max_lod` items in struct `sg_sampler_desc`.
+
+  The change has been implemented in PR https://github.com/floooh/sokol/pull/1103.
+
+### 01-Sep-2024
+
+- sokol_gfx.h d3d11: added a new configuration flag `d3d11_shader_debugging`
+  to the `sg_desc` struct. When this is true, D3D11 shaders which are provided
+  as HLSL source code will be compiled with debug information and no optimization
+  which allows shader debugging in tools like RenderDoc. If you use `sokol-shdc`
+  to build shaders, just omit the `--bytecode / -b` cmdline option to get
+  HLSL source code instead of bytecode, if you use the `fips` build system
+  wrapper (like the `sokol-samples` project), just replace the cmake macro
+  `sokol_shader()` with `sokol_shader_debuggable()`.
+
+  For details see issue https://github.com/floooh/sokol/issues/1043
+  and PR: https://github.com/floooh/sokol/pull/1101.
+
+### 31-Aug-2024
+
+- Some cleanup work in the WebGPU backend bindgroups cache which fixes
+  a number of issues: Destroying an image, sampler, storage buffer
+  or pipeline object now properly evicts any associated item in
+  the bindgroups cache and releases the associated WebGPU BindGroup
+  object. Doing this while the BindGroup is in flight also no longer
+  causes WebGPU errors.
+
+  For details see issue https://github.com/floooh/sokol/issues/1066
+  and PR https://github.com/floooh/sokol/pull/1097
+
+- A fix in the sokol-zig bindings generator for a breaking naming convention
+  change in the Zig stdlib. The fix supports both the old and new naming
+  convention so that sokol-zig continues to be compatible with zig 0.13.0.
+
+  To update the sokol-zig dependency in your project, just run:
+
+  ```
+  zig fetch --save=sokol git+https://github.com/floooh/sokol-zig.git
+  ```
+
+  More Details in PR https://github.com/floooh/sokol/pull/1100
+
+### 26-Aug-2024
+
+A small behaviour update for sokol_gl.h (may be breaking if you call `sgl_error()`):
+
+- Instead of skipping rendering completely for the current frame if an error is encountered
+  (for instance the vertex- or command-buffer running full), sokol-gl will now
+  render all successfully recorded draw commands before the error was recorded.
+- Minor breaking change: `sgl_error_t` has been changed from an error code enum to
+  a struct with a boolean flag per error type, that way no error information is
+  lost if multiple error happen in the same frame.
+- Two new functions to query the current number of recorded vertices and commands
+  in the current frame:
+    - `int sgl_num_vertices(void)`
+    - `int sgl_num_commands(void)`
+
+Also see ticket https://github.com/floooh/sokol/issues/1092 and PR https://github.com/floooh/sokol/pull/1096 for details!
+
+### 14-Aug-2024
+
+The previously 'unofficial' Jai bindings at https://github.com/colinbellino/sokol-jai
+have now been properly integrated with the sokol main repository (meaning that each
+change to the sokol headers will update the bindings automatically).
+
+The only missing part currently is that no test compilation happens in the CI
+pipeline (that's also why the Jai bindings have no badge yet in the readme, I
+think these things will have to wait until Jai leaves closed beta).
+
+Many thanks to @colinbellino for creating the bindings scripts and preparing
+the PR (https://github.com/floooh/sokol/pull/1090).
+
 ### 30-Jul-2024
 
 Merged PR https://github.com/floooh/sokol/pull/1086 which adds Emscripten target platform
@@ -89,7 +186,7 @@ in small-ish textures. This happened at a specific size cutoff which seems to be
 specific (on my laptop with integrated Intel GPU only for textures smaller than
 32x32xN).
 
-Related ticket: https://github.com/floooh/sokol/issues/1066
+Related ticket: https://github.com/floooh/sokol/issues/1063
 ...and PR: https://github.com/floooh/sokol/pull/1065
 
 I also wrote a new sample for investigating the issue and to protect from
@@ -233,7 +330,7 @@ Storage buffer support is not available on the following platform/backend combos
 - likewise, by default sokol_app.h now creates a GL 4.1 context on macOS and a GL 4.3 context on other
   desktop platforms when `SOKOL_GLCORE` is defined
 - if you're passing WGSL shaders directly into sokol_gfx.h (instead of using sokol-shdc), please
-  be aware that the binding offets for the different shader resource types have moved:
+  be aware that the binding offsets for the different shader resource types have moved:
     - vertex shader stage:
       - textures: `@group(1) @binding(0..15)`
       - samplers: `@group(1) @binding(16..31)`
